@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-API_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2/v1/chat/completions"
+API_URL = "https://router.huggingface.co/v1/chat/completions"
 headers = {
     "Authorization": f"Bearer {HF_TOKEN}",
     "Content-Type": "application/json"
@@ -14,7 +14,7 @@ headers = {
 def query_model(prompt: str) -> str:
     try:
         response = requests.post(API_URL, headers=headers, json={
-            "model": "mistralai/Mistral-7B-Instruct-v0.2",
+            "model": "meta-llama/Llama-3.1-8B-Instruct",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 512,
             "temperature": 0.3
