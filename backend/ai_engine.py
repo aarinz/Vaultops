@@ -5,19 +5,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+API_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2/v1/chat/completions"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 def query_model(prompt: str) -> str:
     try:
         response = requests.post(API_URL, headers=headers, json={
-            "inputs": prompt,
-            "parameters": {"max_new_tokens": 512, "temperature": 0.3, "return_full_text": False}
+            "model": "mistralai/Mistral-7B-Instruct-v0.2",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 512,
+            "temperature": 0.3
         }, timeout=60)
         result = response.json()
-        if isinstance(result, list):
-            return result[0]["generated_text"].strip()
-        return str(result)
+        return result["choices"][0]["message"]["content"].strip()
     except Exception as e:
         return f"AI engine error: {str(e)}"
 
