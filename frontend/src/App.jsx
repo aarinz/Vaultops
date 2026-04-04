@@ -3,7 +3,7 @@ import axios from "axios"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
 import { ShieldAlert, CheckCircle, XCircle, Clock, TrendingUp, AlertTriangle, Zap } from "lucide-react"
 
-const API = "http://localhost:8000"
+const API = "https://vaultops.onrender.com"
 
 const getRiskColor = (score) => {
   if (score >= 75) return "#ef4444"
