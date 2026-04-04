@@ -1,0 +1,9 @@
+backend/venv/
+backend/__pycache__/
+backend/.env
+frontend/node_modules/
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/.terraform.lock.hcl
+*.tfvars

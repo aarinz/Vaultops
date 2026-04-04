@@ -1,0 +1,319 @@
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import { ShieldAlert, CheckCircle, XCircle, Clock, TrendingUp, AlertTriangle, Zap } from "lucide-react"
+
+const API = "http://localhost:8000"
+
+const getRiskColor = (score) => {
+  if (score >= 75) return "#ef4444"
+  if (score >= 40) return "#f59e0b"
+  return "#10b981"
+}
+
+const getRiskLabel = (score) => {
+  if (score >= 75) return "HIGH RISK"
+  if (score >= 40) return "MEDIUM RISK"
+  return "LOW RISK"
+}
+
+const StatusBadge = ({ status }) => {
+  const map = {
+    pending: { color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", icon: <Clock size={12} /> },
+    approved: { color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", icon: <CheckCircle size={12} /> },
+    rejected: { color: "bg-red-500/20 text-red-400 border-red-500/30", icon: <XCircle size={12} /> },
+    deployed: { color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: <Zap size={12} /> },
+    rolled_back: { color: "bg-purple-500/20 text-purple-400 border-purple-500/30", icon: <AlertTriangle size={12} /> },
+  }
+  const s = map[status] || map.pending
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-mono uppercase ${s.color}`}>
+      {s.icon}{status}
+    </span>
+  )
+}
+
+export default function App() {
+  const [releases, setReleases] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [form, setForm] = useState({ name: "", description: "" })
+  const [loading, setLoading] = useState(false)
+  const [decisionComment, setDecisionComment] = useState("")
+  const [tab, setTab] = useState("releases")
+
+  const fetchReleases = async () => {
+    const res = await axios.get(`${API}/releases/`)
+    setReleases(res.data)
+  }
+
+  useEffect(() => { fetchReleases() }, [])
+
+  const submitRelease = async () => {
+    if (!form.name || !form.description) return
+    setLoading(true)
+    try {
+      await axios.post(`${API}/releases/`, form)
+      setForm({ name: "", description: "" })
+      await fetchReleases()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const makeDecision = async (id, status) => {
+    await axios.post(`${API}/releases/${id}/decision`, {
+      status,
+      comment: decisionComment
+    })
+    setDecisionComment("")
+    await fetchReleases()
+    if (selected?.id === id) {
+      const res = await axios.get(`${API}/releases/${id}`)
+      setSelected(res.data)
+    }
+  }
+
+  const checkRollback = async (id) => {
+    const pre = { transaction_success_rate: 99.2, revenue_per_min: 4200, error_rate: 0.8 }
+    const post = { transaction_success_rate: 87.1, revenue_per_min: 2900, error_rate: 6.4 }
+    const res = await axios.post(`${API}/releases/${id}/rollback-check`, {
+      pre_metrics: pre,
+      post_metrics: post
+    })
+    alert(`Rollback decision: ${res.data.should_rollback ? "⚠️ ROLLBACK" : "✅ STABLE"}\n\n${res.data.reason}`)
+    await fetchReleases()
+  }
+
+  const chartData = releases.slice(0, 8).map(r => ({
+    name: r.name.slice(0, 10),
+    risk: r.risk_score
+  }))
+
+  return (
+    <div className="min-h-screen bg-[#080c0f] text-slate-200 font-mono">
+      {/* Header */}
+      <div className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ShieldAlert className="text-amber-400" size={24} />
+          <div>
+            <h1 className="text-lg font-bold tracking-widest text-white">VAULTOPS</h1>
+            <p className="text-xs text-slate-500">BA-Governed Financial Release Pipeline</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+          <span className="text-xs text-slate-500">LIVE</span>
+        </div>
+      </div>
+
+      <div className="flex h-[calc(100vh-65px)]">
+        {/* Sidebar */}
+        <div className="w-80 border-r border-slate-800 flex flex-col">
+          {/* Stats */}
+          <div className="grid grid-cols-3 border-b border-slate-800">
+            {[
+              { label: "Total", value: releases.length, color: "text-white" },
+              { label: "Approved", value: releases.filter(r => r.status === "approved").length, color: "text-emerald-400" },
+              { label: "Pending", value: releases.filter(r => r.status === "pending").length, color: "text-yellow-400" },
+            ].map(s => (
+              <div key={s.label} className="p-3 text-center border-r border-slate-800 last:border-0">
+                <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+                <div className="text-xs text-slate-500">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-b border-slate-800">
+            {["releases", "new"].map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`flex-1 py-2 text-xs uppercase tracking-widest transition-colors ${tab === t ? "bg-slate-800 text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                {t === "new" ? "+ New Release" : "Releases"}
+              </button>
+            ))}
+          </div>
+
+          {tab === "releases" ? (
+            <div className="flex-1 overflow-y-auto">
+              {releases.length === 0 && (
+                <div className="p-6 text-center text-slate-600 text-sm">No releases yet</div>
+              )}
+              {releases.map(r => (
+                <div key={r.id} onClick={() => setSelected(r)}
+                  className={`p-4 border-b border-slate-800/50 cursor-pointer hover:bg-slate-800/30 transition-colors ${selected?.id === r.id ? "bg-slate-800/50 border-l-2 border-l-amber-400" : ""}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-white truncate">{r.name}</span>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">{new Date(r.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs font-bold" style={{ color: getRiskColor(r.risk_score) }}>
+                      {r.risk_score?.toFixed(0)}% risk
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 p-4 flex flex-col gap-3">
+              <div>
+                <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">Release Name</label>
+                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. payment-gateway-v2.1"
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-slate-500 uppercase tracking-widest mb-1 block">Change Description</label>
+                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+                  placeholder="Describe what changed: new payment flow, fee structure update, fraud rule modification..."
+                  className="w-full h-40 bg-slate-800/50 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 resize-none" />
+              </div>
+              <button onClick={submitRelease} disabled={loading}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {loading ? "⏳ ANALYZING WITH AI..." : "▶ RUN RISK ANALYSIS"}
+              </button>
+              {loading && (
+                <p className="text-xs text-slate-500 text-center animate-pulse">
+                  Mistral is analyzing business risk & regulatory exposure...
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Main Panel */}
+        <div className="flex-1 overflow-y-auto">
+          {!selected ? (
+            <div className="h-full flex flex-col items-center justify-center gap-6 text-slate-600">
+              <ShieldAlert size={48} />
+              <p className="text-sm">Select a release to review or create a new one</p>
+              {releases.length > 0 && (
+                <div className="w-96">
+                  <p className="text-xs text-center mb-3 text-slate-500 uppercase tracking-widest">Risk Overview</p>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={chartData}>
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#64748b" }} />
+                      <Tooltip contentStyle={{ background: "#0d1318", border: "1px solid #1e2d3a", borderRadius: "4px", fontSize: "12px" }} />
+                      <Bar dataKey="risk" radius={[2, 2, 0, 0]}>
+                        {chartData.map((entry, i) => (
+                          <Cell key={i} fill={getRiskColor(entry.risk)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-6 max-w-3xl">
+              {/* Release Header */}
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white mb-1">{selected.name}</h2>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={selected.status} />
+                    <span className="text-xs text-slate-500">{new Date(selected.created_at).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold" style={{ color: getRiskColor(selected.risk_score) }}>
+                    {selected.risk_score?.toFixed(0)}
+                  </div>
+                  <div className="text-xs" style={{ color: getRiskColor(selected.risk_score) }}>
+                    {getRiskLabel(selected.risk_score)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Risk Bar */}
+              <div className="mb-6">
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span>BUSINESS RISK SCORE</span>
+                  <span>{selected.risk_score?.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${selected.risk_score}%`, backgroundColor: getRiskColor(selected.risk_score) }} />
+                </div>
+              </div>
+
+              {/* Cards Row */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-slate-800/30 border border-slate-700/50 rounded p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp size={14} className="text-red-400" />
+                    <span className="text-xs text-slate-400 uppercase tracking-widest">Cost of Delay</span>
+                  </div>
+                  <div className="text-2xl font-bold text-white">${selected.cost_of_delay?.toFixed(0)}</div>
+                  <div className="text-xs text-slate-500">per hour if blocked</div>
+                </div>
+                <div className="bg-slate-800/30 border border-slate-700/50 rounded p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle size={14} className="text-amber-400" />
+                    <span className="text-xs text-slate-400 uppercase tracking-widest">Regulatory Flags</span>
+                  </div>
+                  <div className="text-sm text-white">
+                    {selected.regulatory_flags
+                      ? selected.regulatory_flags.split(",").map((f, i) => (
+                          <span key={i} className="inline-block bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-2 py-1 rounded mr-1 mb-1">{f.trim()}</span>
+                        ))
+                      : <span className="text-emerald-400 text-xs">✓ No flags</span>
+                    }
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Reasoning */}
+              <div className="bg-slate-800/20 border border-slate-700/30 rounded p-4 mb-6">
+                <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">AI Risk Reasoning</div>
+                <p className="text-sm text-slate-300 leading-relaxed">{selected.ai_reasoning}</p>
+              </div>
+
+              {/* Description */}
+              <div className="bg-slate-800/20 border border-slate-700/30 rounded p-4 mb-6">
+                <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">Change Description</div>
+                <p className="text-sm text-slate-300">{selected.description}</p>
+              </div>
+
+              {/* BA Comment */}
+              {selected.ba_comment && (
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded p-4 mb-6">
+                  <div className="text-xs text-blue-400 uppercase tracking-widest mb-2">BA Decision Comment</div>
+                  <p className="text-sm text-slate-300">{selected.ba_comment}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              {selected.status === "pending" && (
+                <div className="border border-slate-700/50 rounded p-4 mb-4">
+                  <div className="text-xs text-slate-500 uppercase tracking-widest mb-3">BA Decision Gate</div>
+                  <textarea value={decisionComment} onChange={e => setDecisionComment(e.target.value)}
+                    placeholder="Add a comment (optional)..."
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-slate-500 resize-none mb-3" rows={2} />
+                  <div className="flex gap-3">
+                    <button onClick={() => makeDecision(selected.id, "approved")}
+                      className="flex-1 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 text-sm font-bold rounded transition-colors flex items-center justify-center gap-2">
+                      <CheckCircle size={16} /> APPROVE DEPLOY
+                    </button>
+                    <button onClick={() => makeDecision(selected.id, "rejected")}
+                      className="flex-1 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 text-sm font-bold rounded transition-colors flex items-center justify-center gap-2">
+                      <XCircle size={16} /> REJECT DEPLOY
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {selected.status === "approved" && (
+                <button onClick={() => checkRollback(selected.id)}
+                  className="w-full py-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-400 font-bold text-sm rounded transition-colors flex items-center justify-center gap-2">
+                  <AlertTriangle size={16} /> SIMULATE POST-DEPLOY ROLLBACK CHECK
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
