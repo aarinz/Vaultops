@@ -6,7 +6,10 @@ load_dotenv()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 API_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2/v1/chat/completions"
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+headers = {
+    "Authorization": f"Bearer {HF_TOKEN}",
+    "Content-Type": "application/json"
+}
 
 def query_model(prompt: str) -> str:
     try:
@@ -16,6 +19,8 @@ def query_model(prompt: str) -> str:
             "max_tokens": 512,
             "temperature": 0.3
         }, timeout=60)
+        if response.status_code != 200:
+            return f"AI engine error: {response.status_code} {response.text}"
         result = response.json()
         return result["choices"][0]["message"]["content"].strip()
     except Exception as e:
