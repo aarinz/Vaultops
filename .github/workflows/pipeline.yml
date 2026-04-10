@@ -139,9 +139,18 @@ jobs:
           RESPONSE=$(curl -s -X POST "${{ secrets.VAULTOPS_API_URL }}/releases/$RELEASE_ID/rollback-check" \
             -H "Content-Type: application/json" \
             -d '{
-              "pre_metrics": {"transaction_success_rate": 99.2, "revenue_per_min": 4200, "error_rate": 0.8},
-              "post_metrics": {"transaction_success_rate": 99.0, "revenue_per_min": 4185, "error_rate": 0.9}
-            }')
+              "pre_metrics": {
+              "transaction_success_rate": 99.2,
+              "revenue_per_min": 4200,
+              "error_rate": 0.8
+              },
+              "post_metrics": {
+              "transaction_success_rate": 98.7,
+              "revenue_per_min": 4180,
+              "error_rate": 0.9
+              }
+              }'
+              )
 
           echo "Rollback check response: $RESPONSE"
 
