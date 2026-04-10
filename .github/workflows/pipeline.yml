@@ -42,7 +42,7 @@ jobs:
       - name: Check BA approval status
         id: gate
         run: |
-          RELEASE_ID=${{ github.event.inputs.release_id || '1' }}
+          RELEASE_ID=${{ github.event.inputs.release_id || github.run_number }}
           echo "Checking BA gate for release ID: $RELEASE_ID"
 
           RESPONSE=$(curl -s "${{ secrets.VAULTOPS_API_URL }}/gate/$RELEASE_ID")
@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload release artifact to S3
         run: |
-          RELEASE_ID=${{ github.event.inputs.release_id || '1' }}
+          RELEASE_ID=${{ github.event.inputs.release_id || github.run_number }}
           echo "Release ID: $RELEASE_ID" > release-artifact.txt
           echo "Commit: ${{ github.sha }}" >> release-artifact.txt
           echo "Deployed at: $(date -u)" >> release-artifact.txt
@@ -121,7 +121,7 @@ jobs:
 
       - name: Mark release as deployed
         run: |
-          RELEASE_ID=${{ github.event.inputs.release_id || '1' }}
+          RELEASE_ID=${{ github.event.inputs.release_id || github.run_number }}
           curl -s -X POST "${{ secrets.VAULTOPS_API_URL }}/releases/$RELEASE_ID/decision" \
             -H "Content-Type: application/json" \
             -d '{"status": "deployed", "comment": "Deployed via GitHub Actions pipeline"}'
@@ -134,7 +134,7 @@ jobs:
     steps:
       - name: Run rollback check
         run: |
-          RELEASE_ID=${{ github.event.inputs.release_id || '1' }}
+          RELEASE_ID=${{ github.event.inputs.release_id || github.run_number }}
 
           RESPONSE=$(curl -s -X POST "${{ secrets.VAULTOPS_API_URL }}/releases/$RELEASE_ID/rollback-check" \
             -H "Content-Type: application/json" \
