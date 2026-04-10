@@ -140,7 +140,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "pre_metrics": {"transaction_success_rate": 99.2, "revenue_per_min": 4200, "error_rate": 0.8},
-              "post_metrics": {"transaction_success_rate": 97.1, "revenue_per_min": 4100, "error_rate": 1.2}
+              "post_metrics": {"transaction_success_rate": 99.0, "revenue_per_min": 4185, "error_rate": 0.9}
             }')
 
           echo "Rollback check response: $RESPONSE"
