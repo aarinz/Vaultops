@@ -55,23 +55,18 @@ Return ONLY valid JSON, no extra text. [/INST]"""
     }
 
 def analyze_rollback(pre_metrics: dict, post_metrics: dict) -> dict:
-    prompt = f"""[INST] You are a fintech DevOps BA. Compare these metrics and return ONLY a JSON object:
-- should_rollback: boolean
-- reason: string
+    pre_rate = pre_metrics.get("transaction_success_rate", 0)
+    post_rate = post_metrics.get("transaction_success_rate", 0)
 
-Pre-deploy metrics: {pre_metrics}
-Post-deploy metrics: {post_metrics}
+    drop = pre_rate - post_rate
 
-Return ONLY valid JSON. [/INST]"""
-    
-    raw = query_model(prompt)
-    
-    import json, re
-    try:
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if match:
-            return json.loads(match.group())
-    except:
-        pass
-    
-    return {"should_rollback": False, "reason": raw}
+    if drop > 1.0:
+        return {
+            "should_rollback": True,
+            "reason": f"Transaction success rate decreased by {drop:.1f}%"
+        }
+
+    return {
+        "should_rollback": False,
+        "reason": f"Metrics stable. Drop = {drop:.1f}%"
+    }
